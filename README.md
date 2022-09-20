@@ -8,6 +8,9 @@ First, run the development server:
 npm run dev
 # or
 yarn dev
+
+ERC721 DemoNFT
+0xd0b6F308a1C569d8A1d86d6dFad039f0a5c17F15
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
