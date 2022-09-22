@@ -1,11 +1,71 @@
+import { useCallback } from 'react'
 import Moralis  from 'moralis'
 import axios from 'axios'
+import type { EvmNftContractType } from '@moralisweb3/evm-utils'
+
+export interface NftMetadata {
+  name: string
+  description: string
+  image: string
+  animation_url: string | undefined
+  attributes: any
+}
+
+export interface Nft {
+  id: number,
+  contractType: EvmNftContractType
+  name: string
+  symbol: string
+  tokenAddress: string
+  tokenHash: string
+  tokenId: string
+  tokenUri: string | undefined
+  metadata: NftMetadata
+}
 
 const useNft = () => {
-  const startMoralis = async () => {
-    await Moralis.start({
-      apiKey: process.env.moralisApiKey,
-    })
+  /**
+   * getMetadata
+   *
+   * @param tokenUri string | null
+   * @returns Promise<NftMetadata>
+   */
+  const getMetadata = async (tokenUri: string | null): Promise<NftMetadata> => {
+    let metadata: NftMetadata = {
+      name: 'no name',
+      description: 'no description',
+      image: './no_image.png',
+      animation_url: '',
+      attributes: {},
+    }
+
+    if (tokenUri) {
+      const data = await axios.get(`${process.env.dustb0xApiUri}/nft/metadata`, {
+        params: { tokenUri }
+      })
+
+      if (typeof data.data === 'object') {
+        let image = './no_image.png'
+        if (data.data?.image) {
+          if (data.data?.image.indexOf('ipfs://') !== -1) {
+          const str = data.data?.image.split('ipfs://')
+            image = `https://ipfs.io/ipfs/${str[1]}`
+          } else {
+            image = data.data?.image
+          }
+        }
+
+        metadata = {
+          name: data.data?.name ? data.data.name : 'no name',
+          description: data.data?.description ? data.data.description : 'no description',
+          image,
+          animation_url: data.data?.animation_url ? data.data.animation_url : '',
+          attributes: data.data?.attributes ? data.data.attributes : {},
+        }
+      }
+    }
+
+    return metadata
   }
 
   /**
@@ -15,98 +75,43 @@ const useNft = () => {
    * @param chainId
    * @returns
    */
-  const getWalletNfts = async (address: string, chain: number) => {
-    await startMoralis()
+  const getWalletNfts = useCallback(
+    async (address: string, chain: number) => {
+      await Moralis.start({
+        apiKey: process.env.moralisApiKey,
+      })
 
-    const response = await Moralis.EvmApi.nft.getWalletNFTs({
-      address,
-      chain,
-    })
+      const response = await Moralis.EvmApi.nft.getWalletNFTs({
+        address,
+        chain,
+      })
 
-    return response.toJSON()
-  }
+      let id = 1
+      const nfts: Nft[] = []
+      for (const nft of response.toJSON()) {
+        const metadata = await getMetadata(nft?.tokenUri ? nft.tokenUri : null)
 
-  /**
-   * getNftMetadata
-   *
-   * @param nfts
-   * @returns
-   */
-  const getNftMetadata = async (nfts: any) => {
-    try {
-      if (nfts.length === 0) {
-        throw new Error('getNftMetadata: Couldn\'t get NFT.')
-      }
-
-      let count = 0
-      const apiResponse = await Promise.allSettled(nfts.map(async (data: any) => {
-        const response = await axios.get(`${process.env.dustb0xApiUri}/nft/metadata`, {
-          params: {
-            tokenUri: data.tokenUri
-          }
+        nfts.push({
+          id,
+          contractType: nft.contractType,
+          name: nft.name ? nft.name : 'no name',
+          symbol: nft.symbol ? nft.symbol : 'NFT',
+          tokenAddress: nft.tokenAddress,
+          tokenHash: nft.tokenHash ? nft.tokenHash : 'no hash',
+          tokenId: nft.tokenId.toString(),
+          tokenUri: nft.tokenUri,
+          metadata
         })
-          .catch(err => { console.error(err)})
-
-        if (!response?.data) {
-          count++
-          return {
-            id: count,
-            title: `${data.symbol} # ${data.tokenId}`,
-            name: data.name,
-            symbol: data.symbol,
-            description: '-',
-            image: '/no_image.png',
-            attributes: {},
-            contractType: data.contractType,
-            tokenAddress: data.tokenAddress,
-            tokenId: data.tokenId,
-            tokenHash: data.tokenHash,
-            tokenUri: data.tokenUri,
-            ownerOf: data.ownerOf
-          }
-        }
-
-        let image = ''
-        if (response?.data.image.indexOf('ipfs://') !== -1) {
-          const str = response?.data.image.split('ipfs://')
-          image = `https://ipfs.io/ipfs/${str[1]}`
-        } else {
-          image = response.data.image
-        }
-
-        count++
-        return {
-          id: count,
-          title: response?.data.name,
-          name: data.name,
-          symbol: data.symbol,
-          description: response?.data.description,
-          image,
-          attributes: response?.data.attributes,
-          contractType: data.contractType,
-          tokenAddress: data.tokenAddress,
-          tokenId: data.tokenId,
-          tokenHash: data.tokenHash,
-          tokenUri: data.tokenUri,
-          ownerOf: data.ownerOf
-        }
-      }))
-
-      const metadataList = []
-      for (const result of apiResponse) {
-        if (result.status === 'rejected') continue
-        metadataList.push(result.value)
+        id++
       }
 
-      return metadataList
-    } catch(err) {
-      return []
-    }
-  }
+      return nfts
+    },
+    []
+  )
 
   return {
-    getWalletNfts,
-    getNftMetadata
+    getWalletNfts
   }
 }
 

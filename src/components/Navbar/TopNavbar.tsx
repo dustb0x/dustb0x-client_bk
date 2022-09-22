@@ -13,8 +13,6 @@ import {
   Text
 } from '@nextui-org/react'
 
-import { SettingIcon } from '@/components/SettingIcon'
-
 const TopNavbar = () => {
   const { account, active, activate, deactivate } = useWeb3React()
   const [myWalletModal, setMyWalletModal] = useState<boolean>(false)
@@ -48,17 +46,9 @@ const TopNavbar = () => {
                 Connect Wallet
               </Button>
             ) : (
-              <Dropdown placement="bottom-right">
-                <Navbar.Item>
-                  <Dropdown.Trigger>
-                    <Button
-                      auto
-                      light
-                      icon={<SettingIcon />}
-                    />
-                  </Dropdown.Trigger>
-                </Navbar.Item>
-                <Dropdown.Menu>
+              <Dropdown>
+                <Dropdown.Button shadow color="secondary">Menu</Dropdown.Button>
+                <Dropdown.Menu aria-label="Static Actions">
                   <Dropdown.Item key="may-wallet">
                     <Text onClick={() => setMyWalletModal(true)}>
                       My Wallet
